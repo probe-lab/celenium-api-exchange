@@ -16,6 +16,12 @@ paths:
         given predicate.
       operationId: getNetworkPeers
       parameters:
+        - name: network
+          in: path
+          schema:
+            type: string
+          description: The blockchain network of interest.
+          required: true
         - name: protocols
           in: query
           description: |
