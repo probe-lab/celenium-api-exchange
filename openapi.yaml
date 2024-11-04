@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: ProbeLab API
+  description: ProbeLab API
+  version: 1.0.0
+servers:
+  - url: 'https://api.probelab.io'
+paths:
+  '/networks/{network}/peers':
+    get:
+      tags:
+        - Peers
+      summary: Get a list of PeerIDs for the given predicate
+      description: |
+        This endpoint will return all PeerIDs in the given network for the
+        given predicate.
+      operationId: getNetworkPeers
+      parameters:
+        - name: protocols
+          in: query
+          description: |
+            A list of protocols that the peers need to support
+          schema:
+            type: array
+            items:
+              type: string
+              example: /ipfs/id/1.0.0/push,/ipfs/id/1.0.0/pull
+        - name: from
+          in: query
+          description: |
+            The aggregation start timestamp. In combination with the `to` query
+            parameter, this endpoint will only return peers that were seen in 
+            the network within the time range spanned by both timestamps.
+            
+            If this query parameter is not provided ProbeLab will chooses the
+            following defaults for the given network:
+            
+            - Celestia: 12h before the `to` timestamp (which is set to `now` by default)
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: |
+            The aggregation end timestamp. By default this is set to `now`.
+          schema:
+            type: string
+            format: date-time
+
+      responses: # list of responses
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: string
+
+
+
+  '/networks/{network}/peers/{peer_id}':
+    get:
+      tags:
+        - Peers
+      summary: Get information about a single peer.
+      description: |
+        This endpoint will return information about the specified peer.
+      operationId: getNetworkPeer
+      parameters:
+        - name: network
+          in: path
+          description: The network to query the peer from
+          required: true
+          schema:
+            type: string
+            enum: [celestia]
+        - name: peer_id
+          in: path
+          description: The peer ID to retrieve the information for.
+          required: true
+          schema:
+            type: string
+            example: 12D3Koo...MCRk
+
+      responses: # list of responses
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Peer'
+components:
+  schemas:
+    Peer:
+      type: object
+      properties:
+        peerId:
+          type: string
+          description: |
+            The base58btc-encoded multihash of the PeerID string representation.
+            The ones that start with `Qm...`, `12...` or `16...`.
+            We don't guarantee this encoding and might switch to the
+            multibase-encoded CID representation at any time (`bafz...`)
+          example: 12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk
+        agentVersion:
+          type: string
+          nullable: true
+          description: |
+            The agent version that this peer reported in an [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md).
+            If this field is null, we don't have the information.
+        protocols:
+          type: array
+          nullable: true
+          description: |
+            The protocols that this peer reported to support. Source of this
+            information is an [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md)
+            with the peer. If the array is empty, the peer reported no supported
+            protocols. If the array is null we don't have the information.
+          items:
+            type: string
+            example: ["/ipfs/id/1.0.0/push"]
+        multiAddresses:
+          type: array
+          nullable: true
+          description: |
+            All multiaddresses that the node reported to listen on as identified
+            in an  [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md).
+            A single multiaddress can map to multiple IP addresses. This can
+            happen if the multiaddress encodes a DNS name where the DNS entry
+            resolves to multiple IP addresses. Hence beware, the array can
+            contain multiple entries with the same `maddr` key.
+          items:
+            $ref: '#/components/schemas/MultiAddress'
+        properties:
+          type: object
+          description: |
+            Depending on the network that this peer belongs to, the `properties`
+            will contain additional peer information that are specific to the
+            network.
+          oneOf:
+            - $ref: '#/components/schemas/PeerPropertiesCelestia'
+
+    MultiAddress:
+      type: object
+      properties:
+        multiAddress:
+          type: string
+          description: |
+            The full multiaddress encoded as a string.
+          example: /ip4/123.4.5.67/tcp/3340
+        ip:
+          type: string
+          description: |
+            An IPv4 or IPv6 address extracted from the `multiAddress`. If the
+            Multiaddress encodes multiple `ip4` or `ip6` components this will
+            contain the first occurrence.
+          example: 123.4.5.67
+        country:
+          type: string
+          nullable: true
+          description: |
+            The [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+            two-letter country code associated with the IP address. Note, IP
+            address allocations to countries can change over time. The reported
+            country corresponds to the time when we first found this IP address
+            in the network. We presume the allocation drift is not large but
+            we are working on providing more accurate data.
+            
+            If this field is null we were not able to map this IP to a country.
+          example: FR
+        continent:
+          type: string
+          nullable: true
+          description: |
+            A two-letter code representing the continent that the extracted
+            IP address belongs to. The mapping is as follows:
+            
+            - AF = Africa
+            - AN = Antarctica
+            - AS = Asia
+            - EU = Europe
+            - NA = North America
+            - OC = Oceania
+            - SA = South America
+            
+            If this field is null we were not able to map this IP to a continent.
+          example: NA
+        datacenter:
+          type: string
+          nullable: true
+          description: |
+            The name of the datacenter that the extracted IP address belongs to.
+            
+            If this field is null the extracted IP address does not belong to
+            a known datacenter IP range. You can consider the IP address to
+            belong to a home network.
+        reachability:
+          type: string
+          enum:
+            - private
+            - public
+            - relay
+          description: |
+            Indicates whether the extracted IP address falls into a private or
+            public IP range. If the value is `relay`, this means that the 
+            Multiaddress encodes a relay address which would render the
+            geolocation information obsolete as they would belong to the
+            relaying peer instead.
+        asn:
+          type: integer
+          nullable: true
+          description: |
+            The [autonomous system number (ASN)](https://en.wikipedia.org/wiki/Autonomous_system_(Internet))
+            that the extract IP belongs to.
+            
+            If this field is null we were not able to find it in our database.
+    PeerPropertiesCelestia:
+      type: object
+      properties:
+        nodeType:
+          type: string
+          enum:
+            - unknown
+            - light
+            - full
+            - bridge
+          description: |
+            The type of node that this peer represents:
+            
+            - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
+            - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
+            - Celestia bridge nodes connect the data availability layer and the consensus layer.
+          example: light
