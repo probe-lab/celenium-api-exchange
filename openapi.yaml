@@ -1,36 +1,90 @@
 openapi: 3.1.0
 info:
   title: ProbeLab API
-  description: ProbeLab API
+  summary: ProbeLab API for awesome metrics 💫
+  description: |
+    The ProbeLab API offers robust endpoints for retrieving detailed network 
+    metrics and peer information. This API allows users to fetch comprehensive
+    lists of PeerIDs within specified networks and obtain granular details about
+    individual peers, such as their supported protocols, agent versions, and
+    network-related properties. It facilitates advanced querying with multiple 
+    filters and time ranges, providing indispensable insights for network
+    analysis and monitoring. With rich metadata about peer connectivity
+    and geolocation, the ProbeLab API is ideal for developers and researchers
+    aiming to perform in-depth network diagnostics and performance assessments.
+
+    All successful responses will only have a `data` field containing the payload
+    and an optional `meta` field potentially containing additional information.
+
+    All error responses will only have an `errors` field containing an array of
+    errors. There will always be at least one error.
+
   version: 1.0.0
+  contact:
+    name: ProbeLab Team
+    url: https://probelab.io
+    email: team@probelab.io
 servers:
   - url: 'https://api.probelab.io'
+    description: Production
+  # - url: 'https://dev.probelab.io'
+  #   description: Development
+
+security:
+  - ApiKeyAuth: []
+
 paths:
-  '/networks/{network}/peers':
+  # TODO: limit response size + pagination?
+  /v1/projects/celestia/networks/{network}/peers:
     get:
       tags:
-        - Peers
-      summary: Get a list of PeerIDs for the given predicate
+        - Celestia
+      summary: Get a list of PeerIDs
       description: |
-        This endpoint will return all PeerIDs in the given network for the
-        given predicate.
+        This endpoint will return all PeerIDs from the given Celestia network. By default
+        it will not return all PeerIDs that ProbeLab has in its database but instead adhere
+        to the given filter conditions. If no filter conditions are provided the documented
+        defaults below are applied.
       operationId: getNetworkPeers
       parameters:
-        - name: network
-          in: path
-          schema:
-            type: string
-          description: The blockchain network of interest.
-          required: true
+        - $ref: '#/components/parameters/celestiaNetwork'
         - name: protocols
           in: query
           description: |
-            A list of protocols that the peers need to support
+            A list of protocols that the peers need to support. You can specify at most ten
+            protocols. If left empty, no filtering is applied.
           schema:
             type: array
             items:
               type: string
-              example: /ipfs/id/1.0.0/push,/ipfs/id/1.0.0/pull
+              examples:
+                - ["/ipfs/id/1.0.0/push", "/ipfs/id/1.0.0/pull"]
+            maxItems: 10
+            minItems: 0
+        - name: agentVersion
+          in: query
+          description: |
+            A list of agent versions that the peers are running. You can specify at most ten
+            agent versions. If left empty, no filtering is applied.
+          schema:
+            type: array
+            items:
+              type: string
+              examples:
+                - ["/kubo/0.32.0"]
+            maxItems: 10
+            minItems: 0
+        - name: nodeType
+          in: query
+          description: |
+            The type of Celestia peer:
+            
+            - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
+            - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
+            - Celestia bridge nodes connect the data availability layer and the consensus layer.
+          schema:
+            $ref: '#/components/schemas/CelestiaNodeType'
+          example: "light"
         - name: from
           in: query
           description: |
@@ -38,22 +92,27 @@ paths:
             parameter, this endpoint will only return peers that were seen in 
             the network within the time range spanned by both timestamps.
             
-            If this query parameter is not provided ProbeLab will chooses the
-            following defaults for the given network:
-            
-            - Celestia: 12h before the `to` timestamp (which is set to `now` by default)
+            If this query parameter is not provided the API will return all peers
+            that were seen up until 24h before the `to` timestamp (which is set
+            to `now` by default)
+
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
+          example: "2024-11-05T10:04:30"
           schema:
             type: string
             format: date-time
         - name: to
           in: query
           description: |
-            The aggregation end timestamp. By default this is set to `now`.
+            The aggregation end timestamp. By default this is set to the current time.
+
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
           schema:
             type: string
             format: date-time
+          example: "2024-11-05T10:04:30"
 
-      responses: # list of responses
+      responses:
         '200':
           description: Success
           content:
@@ -62,37 +121,46 @@ paths:
                 type: object
                 properties:
                   data:
-                    type: array
-                    items:
-                      type: string
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        format: date-time
+                      to:
+                        type: string
+                        format: date-time
+                      peerIDs:
+                        type: array
+                        items:
+                          type: string
+                          examples:
+                            - "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
+        '400':
+          description: Bad Request
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized
+          $ref: '#/components/responses/ErrorResponse'
 
-
-
-  '/networks/{network}/peers/{peer_id}':
+  /v1/projects/celestia/networks/{network}/peers/{peerId}:
     get:
       tags:
-        - Peers
+        - Celestia
       summary: Get information about a single peer.
       description: |
-        This endpoint will return information about the specified peer.
+        This endpoint will return information about the given peer.
       operationId: getNetworkPeer
       parameters:
-        - name: network
-          in: path
-          description: The network to query the peer from
-          required: true
-          schema:
-            type: string
-            enum: [celestia]
-        - name: peer_id
+        - $ref: '#/components/parameters/celestiaNetwork'
+        - name: peerId
           in: path
           description: The peer ID to retrieve the information for.
           required: true
           schema:
             type: string
-            example: 12D3Koo...MCRk
+          example: "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
 
-      responses: # list of responses
+      responses:
         '200':
           description: Success
           content:
@@ -101,9 +169,163 @@ paths:
                 type: object
                 properties:
                   data:
-                    $ref: '#/components/schemas/Peer'
+                    allOf:
+                      - $ref: '#/components/schemas/Peer'
+                      - $ref: '#/components/schemas/CelestiaPeer'
+        '400':
+          description: Bad Request
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          description: Not Found
+          $ref: '#/components/responses/ErrorResponse'
+
+  /v1/projects/celestia/networks/{network}/stats/{statistic}:
+    get:
+      tags:
+        - Celestia
+      summary: Get aggregate information about the given network.
+      description: |
+        This endpoint returns statistics about the given Celestia network. Valid values are
+
+        - `country`
+        - `protocol`
+        - `datacenter`
+        - `nodeType`
+        - `isDatacenter`
+
+        If the `country` statistic is chosen, this endpoint will return the number of peers
+        that we have seen in the given 
+        This endpoint will return the distribution of [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
+        two-letter country codes. There are two special cases:
+
+        1. We could not identify the geolocation of a peer: `none`
+        2. A peer could be mapped to multiple countries: `multi`
+      operationId: getNetworkStats
+      parameters:
+        - $ref: '#/components/parameters/celestiaNetwork'
+        - name: statistic
+          in: path
+          description: The aggregation of interest.
+          required: true
+          schema:
+            $ref: '#/components/schemas/CelestiaStatistics'
+        - name: nodeType
+          in: query
+          description: |
+            Filter the aggregation by node type.
+          schema:
+            $ref: '#/components/schemas/CelestiaNodeType'
+          example: "light"
+        - name: from
+          in: query
+          description: |
+            The aggregation start timestamp. In combination with the `to` query
+            parameter, this endpoint will only return peers that were seen in 
+            the network within the time range spanned by both timestamps.
+            
+            If this query parameter is not provided the API will return all peers
+            that were seen up until 24h before the `to` timestamp (which is set
+            to `now` by default)
+
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
+          example: "2024-11-05T10:04:30"
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          description: |
+            The aggregation end timestamp. By default this is set to the current time.
+
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
+          schema:
+            type: string
+            format: date-time
+          example: "2024-11-05T10:04:30"
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      from:
+                        type: string
+                        format: date-time
+                      to:
+                        type: string
+                        format: date-time
+                      statistic:
+                        $ref: '#/components/schemas/CelestiaStatistics'
+                      distribution:
+                        type: object
+                        additionalProperties:
+                          type: number
+                examples:
+                  - data:
+                      from: "2024-11-04T00:00:00"
+                      to: "2024-11-05T00:00:00"
+                      statistic: "country"
+                      distribution:
+                        DE: 2300
+                        US: 3322
+                        BR: 2356
+                        FR: 123
+                        none: 23
+                        multi: 122
+        '400':
+          description: Bad Request
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          description: Unauthorized
+          $ref: '#/components/responses/ErrorResponse'
+
+
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: ProbeLab-API-Key
+
+  parameters:
+    celestiaNetwork:
+      name: network
+      in: path
+      description: The network of interest. Arabica and Mocha are not supported yet.
+      required: true
+      schema:
+        type: string
+        enum: [mainnet]
+
   schemas:
+    CelestiaStatistics:
+      type: string
+      enum: [country, protocol, datacenter, nodeType, isDatacenter]
+
+    CelestiaNodeType:
+      type: string
+      enum:
+        - unknown
+        - light
+        - full
+        - bridge
+      description: |
+        The type of Celestia peer:
+        
+        - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
+        - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
+        - Celestia bridge nodes connect the data availability layer and the consensus layer.
+      examples:
+        - light
+
     Peer:
       type: object
       properties:
@@ -114,13 +336,16 @@ components:
             The ones that start with `Qm...`, `12...` or `16...`.
             We don't guarantee this encoding and might switch to the
             multibase-encoded CID representation at any time (`bafz...`)
-          example: 12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk
+          examples:
+            - "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
         agentVersion:
           type: string
           nullable: true
           description: |
             The agent version that this peer reported in an [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md).
             If this field is null, we don't have the information.
+          examples:
+            - celestia-node/full/v0.17.2
         protocols:
           type: array
           nullable: true
@@ -131,7 +356,8 @@ components:
             protocols. If the array is null we don't have the information.
           items:
             type: string
-            example: ["/ipfs/id/1.0.0/push"]
+            examples:
+              - "/ipfs/id/1.0.0/push"
         multiAddresses:
           type: array
           nullable: true
@@ -144,14 +370,6 @@ components:
             contain multiple entries with the same `maddr` key.
           items:
             $ref: '#/components/schemas/MultiAddress'
-        properties:
-          type: object
-          description: |
-            Depending on the network that this peer belongs to, the `properties`
-            will contain additional peer information that are specific to the
-            network.
-          oneOf:
-            - $ref: '#/components/schemas/PeerPropertiesCelestia'
 
     MultiAddress:
       type: object
@@ -160,14 +378,16 @@ components:
           type: string
           description: |
             The full multiaddress encoded as a string.
-          example: /ip4/123.4.5.67/tcp/3340
+          examples:
+            - /ip4/123.4.5.67/tcp/3340
         ip:
           type: string
           description: |
             An IPv4 or IPv6 address extracted from the `multiAddress`. If the
             Multiaddress encodes multiple `ip4` or `ip6` components this will
             contain the first occurrence.
-          example: 123.4.5.67
+          examples:
+            - 123.4.5.67
         country:
           type: string
           nullable: true
@@ -180,7 +400,8 @@ components:
             we are working on providing more accurate data.
             
             If this field is null we were not able to map this IP to a country.
-          example: FR
+          examples:
+            - FR
         continent:
           type: string
           nullable: true
@@ -197,7 +418,8 @@ components:
             - SA = South America
             
             If this field is null we were not able to map this IP to a continent.
-          example: NA
+          examples:
+            - NA
         datacenter:
           type: string
           nullable: true
@@ -227,20 +449,45 @@ components:
             that the extract IP belongs to.
             
             If this field is null we were not able to find it in our database.
-    PeerPropertiesCelestia:
+
+    CelestiaPeer:
       type: object
       properties:
         nodeType:
+          $ref: '#/components/schemas/CelestiaNodeType'
+
+    Error:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/ErrorCode'
+
+        message:
           type: string
-          enum:
-            - unknown
-            - light
-            - full
-            - bridge
-          description: |
-            The type of node that this peer represents:
-            
-            - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
-            - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
-            - Celestia bridge nodes connect the data availability layer and the consensus layer.
-          example: light
+          description: The error message.
+
+        details:
+          type: object
+          nullable: true
+          description: Additional details about the error if any.
+
+    ErrorCode:
+      type: string
+      enum:
+        - UNKNOWN
+      description: |
+        Sort order:
+        - `UNKNOWN` - An unknown error occured
+
+  responses:
+    ErrorResponse:
+      description: A generic error response.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              errors:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Error'
