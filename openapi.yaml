@@ -3,23 +3,17 @@ info:
   title: ProbeLab API
   summary: ProbeLab API for awesome metrics 💫
   description: |
-    The ProbeLab API offers robust endpoints for retrieving detailed network 
-    metrics and peer information. This API allows users to fetch comprehensive
-    lists of PeerIDs within specified networks and obtain granular details about
-    individual peers, such as their supported protocols, agent versions, and
-    network-related properties. It facilitates advanced querying with multiple 
-    filters and time ranges, providing indispensable insights for network
-    analysis and monitoring. With rich metadata about peer connectivity
-    and geolocation, the ProbeLab API is ideal for developers and researchers
-    aiming to perform in-depth network diagnostics and performance assessments.
+    The ProbeLab API offers endpoints for retrieving detailed network 
+    metrics. 
 
-    All successful responses will only have a `data` field containing the payload
-    and an optional `meta` field potentially containing additional information.
+    This API loosely follows the [Google JSON Style Guide](https://google.github.io/styleguide/jsoncstyleguide.xml).
+    This means, all successful responses will only have a `data` field
+    containing the payload. All error responses will only have an `error` field
+    containing at least a `message` field with an error description. Following
+    the style guide, if there are multiple errors the `error` object will
+    contain another `errors` array.
 
-    All error responses will only have an `errors` field containing an array of
-    errors. There will always be at least one error.
-
-  version: 1.0.0
+  version: 0.1.0
   contact:
     name: ProbeLab Team
     url: https://probelab.io
@@ -27,224 +21,95 @@ info:
 servers:
   - url: 'https://api.probelab.io'
     description: Production
-  # - url: 'https://dev.probelab.io'
-  #   description: Development
 
 security:
   - ApiKeyAuth: []
 
 paths:
-  # TODO: limit response size + pagination?
-  /v1/projects/celestia/networks/{network}/peers:
-    get:
-      tags:
-        - Celestia
-      summary: Get a list of PeerIDs
-      description: |
-        This endpoint will return all PeerIDs from the given Celestia network. By default
-        it will not return all PeerIDs that ProbeLab has in its database but instead adhere
-        to the given filter conditions. If no filter conditions are provided the documented
-        defaults below are applied.
-      operationId: getNetworkPeers
-      parameters:
-        - $ref: '#/components/parameters/celestiaNetwork'
-        - name: protocols
-          in: query
-          description: |
-            A list of protocols that the peers need to support. You can specify at most ten
-            protocols. If left empty, no filtering is applied.
-          schema:
-            type: array
-            items:
-              type: string
-              examples:
-                - ["/ipfs/id/1.0.0/push", "/ipfs/id/1.0.0/pull"]
-            maxItems: 10
-            minItems: 0
-        - name: agentVersion
-          in: query
-          description: |
-            A list of agent versions that the peers are running. You can specify at most ten
-            agent versions. If left empty, no filtering is applied.
-          schema:
-            type: array
-            items:
-              type: string
-              examples:
-                - ["/kubo/0.32.0"]
-            maxItems: 10
-            minItems: 0
-        - name: nodeType
-          in: query
-          description: |
-            The type of Celestia peer:
-            
-            - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
-            - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
-            - Celestia bridge nodes connect the data availability layer and the consensus layer.
-          schema:
-            $ref: '#/components/schemas/CelestiaNodeType'
-          example: "light"
-        - name: from
-          in: query
-          description: |
-            The aggregation start timestamp. In combination with the `to` query
-            parameter, this endpoint will only return peers that were seen in 
-            the network within the time range spanned by both timestamps.
-            
-            If this query parameter is not provided the API will return all peers
-            that were seen up until 24h before the `to` timestamp (which is set
-            to `now` by default)
-
-            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
-          example: "2024-11-05T10:04:30"
-          schema:
-            type: string
-            format: date-time
-        - name: to
-          in: query
-          description: |
-            The aggregation end timestamp. By default this is set to the current time.
-
-            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
-          schema:
-            type: string
-            format: date-time
-          example: "2024-11-05T10:04:30"
-
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    type: object
-                    properties:
-                      from:
-                        type: string
-                        format: date-time
-                      to:
-                        type: string
-                        format: date-time
-                      peerIDs:
-                        type: array
-                        items:
-                          type: string
-                          examples:
-                            - "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
-        '400':
-          description: Bad Request
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          description: Unauthorized
-          $ref: '#/components/responses/ErrorResponse'
-
-  /v1/projects/celestia/networks/{network}/peers/{peerId}:
-    get:
-      tags:
-        - Celestia
-      summary: Get information about a single peer.
-      description: |
-        This endpoint will return information about the given peer.
-      operationId: getNetworkPeer
-      parameters:
-        - $ref: '#/components/parameters/celestiaNetwork'
-        - name: peerId
-          in: path
-          description: The peer ID to retrieve the information for.
-          required: true
-          schema:
-            type: string
-          example: "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
-
-      responses:
-        '200':
-          description: Success
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  data:
-                    allOf:
-                      - $ref: '#/components/schemas/Peer'
-                      - $ref: '#/components/schemas/CelestiaPeer'
-        '400':
-          description: Bad Request
-          $ref: '#/components/responses/ErrorResponse'
-        '401':
-          description: Unauthorized
-          $ref: '#/components/responses/ErrorResponse'
-        '404':
-          description: Not Found
-          $ref: '#/components/responses/ErrorResponse'
-
   /v1/projects/celestia/networks/{network}/stats/{statistic}:
     get:
       tags:
         - Celestia
-      summary: Get aggregate information about the given network.
+      summary: Get Aggregate Statistics
       description: |
-        This endpoint returns statistics about the given Celestia network. Valid values are
+        This endpoint returns statistics about the given Celestia network. Check
+        the different path and query parameter documentation below. The maximum
+        number of data points that this endpoint returns is `512`. The number of
+        data points is derived by dividing the `start` and `end` time range
+        by the `interval` duration. This is an arbitrary limitation and if
+        you need different limits, let us know.
+        
+        This endpoint only allows seconds precision.
 
-        - `country`
-        - `protocol`
-        - `datacenter`
-        - `nodeType`
-        - `isDatacenter`
-
-        If the `country` statistic is chosen, this endpoint will return the number of peers
-        that we have seen in the given 
-        This endpoint will return the distribution of [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
-        two-letter country codes. There are two special cases:
-
-        1. We could not identify the geolocation of a peer: `none`
-        2. A peer could be mapped to multiple countries: `multi`
       operationId: getNetworkStats
       parameters:
         - $ref: '#/components/parameters/celestiaNetwork'
         - name: statistic
           in: path
-          description: The aggregation of interest.
+          description: |
+            The aggregation of interest. In the future we will support more.
           required: true
           schema:
             $ref: '#/components/schemas/CelestiaStatistics'
-        - name: nodeType
+        - name: start
           in: query
           description: |
-            Filter the aggregation by node type.
-          schema:
-            $ref: '#/components/schemas/CelestiaNodeType'
-          example: "light"
-        - name: from
-          in: query
-          description: |
-            The aggregation start timestamp. In combination with the `to` query
-            parameter, this endpoint will only return peers that were seen in 
-            the network within the time range spanned by both timestamps.
+            The UTC aggregation start timestamp. In combination with the `end`
+            query parameter, this endpoint will only return the aggregation of
+            peers that were seen in the network within the time range spanned by
+            both timestamps.
             
             If this query parameter is not provided the API will return all peers
-            that were seen up until 24h before the `to` timestamp (which is set
-            to `now` by default)
+            that were seen up until 24h before the `end` timestamp (which is set
+            to `now` by default).
+            
+            Note that the timestamp will be rounded down to the nearest multiple
+            of `interval` which is set to 3600 seconds (1h).
 
-            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
-          example: "2024-11-05T10:04:30"
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)
+            in the format `2006-01-02T15:04:05+07:00`. You can omit the timezone
+            part `2006-01-02T15:04:05Z` (the `Z` suffix indicates UTC).
+
+          example: "2024-11-05T10:04:30Z"
           schema:
             type: string
             format: date-time
-        - name: to
+        - name: end
           in: query
           description: |
-            The aggregation end timestamp. By default this is set to the current time.
+            The UTC aggregation end timestamp. By default this is set to the current
+            time.
+            
+            Note that the timestamp will be rounded down to the nearest multiple
+            of `interval` which is set to 3600 seconds (1h).
 
-            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339), section 5.6.
+            You can provide timestamps as defined by [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)
+            in the format `2006-01-02T15:04:05+07:00`. You can omit the timezone
+            part `2006-01-02T15:04:05Z` (the `Z` suffix indicates UTC).
           schema:
             type: string
             format: date-time
-          example: "2024-11-05T10:04:30"
+          example: "2024-11-05T10:04:30Z"
+        - name: interval
+          in: query
+          description: |
+            The aggregation interval in seconds. By default this is set to 3600
+            (1h).
+            
+            The `start` and `end` times will be rounded down to a multiple of 
+            `interval` (since the beginning of the unix epoch).
+            
+            For example, the a start or end timestamp of `2024-12-07T12:15:36`
+            with an interval of `1h` will be truncated to `2024-12-07T12:00:00`.
+            
+            Further, the time range spanned by start and end will be divided
+            into `interval`-sized chunks in which the aggregation happens.
+
+          schema:
+            type: integer
+            minimum: 1
+            default: 3600
+          example: "86400"
       responses:
         '200':
           description: Success
@@ -256,30 +121,104 @@ paths:
                   data:
                     type: object
                     properties:
-                      from:
+                      start:
                         type: string
                         format: date-time
-                      to:
+                        description: |
+                          The start time used for the aggregation. This can differ
+                          from the provided start time. As indicated above, the
+                          given timestamp is rounded down to the nearest multiple
+                          of `interval`. Then, if the `start` timestamp is after
+                          the `end` timestamp, we exchange both values. This
+                          timestamp also may not match the first timestamp in
+                          the `index` array. This can happen if we don't have
+                          data points for such an early time. It just indicates
+                          the start of the search space.
+                      end:
                         type: string
                         format: date-time
+                        description: |
+                          The end time used for the aggregation. This can differ
+                          from the provided end time. As indicated above, the
+                          given timestamp is rounded down to the nearest multiple
+                          of `interval`. Then, if the `end` timestamp is before
+                          the `start` timestamp, we exchange both values. This
+                          timestamp also never matches the last timestamp in
+                          the `index` array. The last timestamp in the array
+                          corresponds to the last bucket of the aggregation until
+                          the `end` time. Therefore, the last timestamp in the
+                          list is usually `interval` seconds earlier than this
+                          `end` timestamp. If the `end` timestamp is in the
+                          future the difference of the last timestamp in the
+                          index array and this `end` value is larger accordingly.
+                          It just indicates the end of the search space.
+                      interval:
+                        type: integer
+                        description: |
+                          The used aggregation interval in seconds.
+                      project:
+                        type: string
+                        description: |
+                          Mirroring back the project that was aggregated.
+                      network:
+                        type: string
+                        description: |
+                          Mirroring back the network that was aggregated.
                       statistic:
                         $ref: '#/components/schemas/CelestiaStatistics'
-                      distribution:
-                        type: object
-                        additionalProperties:
-                          type: number
+                        description: |
+                          Mirroring back the statistic that the data represents.
+                      index:
+                        type: array
+                        items:
+                          type: string
+                        description: |
+                          Depending on the aggregation this is index for the data.
+                          When plotting the data, this commonly will contain
+                          x-axis values. In the case of the `nodetype` statistic
+                          this will contain timestamp strings in the [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)
+                          format with seconds precision.
+                      columns:
+                        type: array
+                        items:
+                          type: string
+                        description: |
+                          For each index entry we can have multiple values that
+                          correspond to that index. In the case of the `nodetype`
+                          statistic we can have values for multiple node types
+                          at each timestamp. This `colums` array will contain
+                          an ordered list of node types. The ordering corresponds
+                          to the values array of arrays below.
+                      values:
+                        type: array
+                        items:
+                          type: array
+                          items:
+                            type: number
+                        description: |
+                          An array of arrays. Each item in the top level array
+                          corresponds to a single index and each item in the
+                          nested array to a column.
                 examples:
                   - data:
-                      from: "2024-11-04T00:00:00"
-                      to: "2024-11-05T00:00:00"
-                      statistic: "country"
-                      distribution:
-                        DE: 2300
-                        US: 3322
-                        BR: 2356
-                        FR: 123
-                        none: 23
-                        multi: 122
+                      start: "2024-12-05T00:00:00"
+                      end: "2024-12-05T02:00:00"
+                      interval: 3600
+                      statistic: "nodetype"
+                      project: "celestia"
+                      network: "mainnet"
+                      index:
+                        - "2024-12-05T00:00:00"
+                        - "2024-12-05T01:00:00"
+                      columns:
+                        - "bridge"
+                        - "full"
+                        - "light"
+                        - "other"
+                      values:
+                        - [ 124, 17, 229, 33 ]
+                        - [ 123, 17, 229, 33 ]
+
         '400':
           description: Bad Request
           $ref: '#/components/responses/ErrorResponse'
@@ -293,7 +232,7 @@ components:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: ProbeLab-API-Key
+      name: X-API-Key
 
   parameters:
     celestiaNetwork:
@@ -308,176 +247,7 @@ components:
   schemas:
     CelestiaStatistics:
       type: string
-      enum: [country, protocol, datacenter, nodeType, isDatacenter]
-
-    CelestiaNodeType:
-      type: string
-      enum:
-        - unknown
-        - light
-        - full
-        - bridge
-      description: |
-        The type of Celestia peer:
-        
-        - Celestia light nodes allow you to perform data availability sampling (DAS) on Celestia's data availability (DA) network.
-        - Celestia full storage nodes are nodes that do not connect to celestia-app (hence not a consensus node), but store all the data.
-        - Celestia bridge nodes connect the data availability layer and the consensus layer.
-      examples:
-        - light
-
-    Peer:
-      type: object
-      properties:
-        peerId:
-          type: string
-          description: |
-            The base58btc-encoded multihash of the PeerID string representation.
-            The ones that start with `Qm...`, `12...` or `16...`.
-            We don't guarantee this encoding and might switch to the
-            multibase-encoded CID representation at any time (`bafz...`)
-          examples:
-            - "12D3KooWCDybnckBvvJNgSciNjiFjAFbz9KRtGeynoYsCWwVQPWk"
-        agentVersion:
-          type: string
-          nullable: true
-          description: |
-            The agent version that this peer reported in an [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md).
-            If this field is null, we don't have the information.
-          examples:
-            - celestia-node/full/v0.17.2
-        protocols:
-          type: array
-          nullable: true
-          description: |
-            The protocols that this peer reported to support. Source of this
-            information is an [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md)
-            with the peer. If the array is empty, the peer reported no supported
-            protocols. If the array is null we don't have the information.
-          items:
-            type: string
-            examples:
-              - "/ipfs/id/1.0.0/push"
-        multiAddresses:
-          type: array
-          nullable: true
-          description: |
-            All multiaddresses that the node reported to listen on as identified
-            in an  [identify exchange](https://github.com/libp2p/specs/blob/master/identify/README.md).
-            A single multiaddress can map to multiple IP addresses. This can
-            happen if the multiaddress encodes a DNS name where the DNS entry
-            resolves to multiple IP addresses. Hence beware, the array can
-            contain multiple entries with the same `maddr` key.
-          items:
-            $ref: '#/components/schemas/MultiAddress'
-
-    MultiAddress:
-      type: object
-      properties:
-        multiAddress:
-          type: string
-          description: |
-            The full multiaddress encoded as a string.
-          examples:
-            - /ip4/123.4.5.67/tcp/3340
-        ip:
-          type: string
-          description: |
-            An IPv4 or IPv6 address extracted from the `multiAddress`. If the
-            Multiaddress encodes multiple `ip4` or `ip6` components this will
-            contain the first occurrence.
-          examples:
-            - 123.4.5.67
-        country:
-          type: string
-          nullable: true
-          description: |
-            The [`ISO 3166-1 alpha-2`](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2)
-            two-letter country code associated with the IP address. Note, IP
-            address allocations to countries can change over time. The reported
-            country corresponds to the time when we first found this IP address
-            in the network. We presume the allocation drift is not large but
-            we are working on providing more accurate data.
-            
-            If this field is null we were not able to map this IP to a country.
-          examples:
-            - FR
-        continent:
-          type: string
-          nullable: true
-          description: |
-            A two-letter code representing the continent that the extracted
-            IP address belongs to. The mapping is as follows:
-            
-            - AF = Africa
-            - AN = Antarctica
-            - AS = Asia
-            - EU = Europe
-            - NA = North America
-            - OC = Oceania
-            - SA = South America
-            
-            If this field is null we were not able to map this IP to a continent.
-          examples:
-            - NA
-        datacenter:
-          type: string
-          nullable: true
-          description: |
-            The name of the datacenter that the extracted IP address belongs to.
-            
-            If this field is null the extracted IP address does not belong to
-            a known datacenter IP range. You can consider the IP address to
-            belong to a home network.
-        reachability:
-          type: string
-          enum:
-            - private
-            - public
-            - relay
-          description: |
-            Indicates whether the extracted IP address falls into a private or
-            public IP range. If the value is `relay`, this means that the 
-            Multiaddress encodes a relay address which would render the
-            geolocation information obsolete as they would belong to the
-            relaying peer instead.
-        asn:
-          type: integer
-          nullable: true
-          description: |
-            The [autonomous system number (ASN)](https://en.wikipedia.org/wiki/Autonomous_system_(Internet))
-            that the extract IP belongs to.
-            
-            If this field is null we were not able to find it in our database.
-
-    CelestiaPeer:
-      type: object
-      properties:
-        nodeType:
-          $ref: '#/components/schemas/CelestiaNodeType'
-
-    Error:
-      type: object
-      properties:
-        code:
-          $ref: '#/components/schemas/ErrorCode'
-
-        message:
-          type: string
-          description: The error message.
-
-        details:
-          type: object
-          nullable: true
-          description: Additional details about the error if any.
-
-    ErrorCode:
-      type: string
-      enum:
-        - UNKNOWN
-      description: |
-        Sort order:
-        - `UNKNOWN` - An unknown error occured
+      enum: [nodetype]
 
   responses:
     ErrorResponse:
@@ -487,7 +257,8 @@ components:
           schema:
             type: object
             properties:
-              errors:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Error'
+              error:
+                type: object
+                properties:
+                  message:
+                    type: string
