@@ -13,7 +13,7 @@ info:
     the style guide, if there are multiple errors the `error` object will
     contain another `errors` array.
 
-  version: 0.1.0
+  version: 0.2.0
   contact:
     name: ProbeLab Team
     url: https://probelab.io
@@ -39,7 +39,7 @@ paths:
         by the `interval` duration. This is an arbitrary limitation and if
         you need different limits, let us know.
         
-        This endpoint only allows seconds precision.
+        This default data points granularity is 1h and the minimum is 10 minutes.
 
       operationId: getNetworkStats
       parameters:
@@ -47,7 +47,17 @@ paths:
         - name: statistic
           in: path
           description: |
-            The aggregation of interest. In the future we will support more.
+            The aggregation of interest.
+            
+            In the future we plan to support:
+            
+            - `country` - The `columns` field in the response will contain 2 letter
+              [ISO 3166-1](https://en.wikipedia.org/wiki/ISO_3166-1) alpha-2 codes like `US`, `GR`, or `FR`.
+            - `protocol` - The `columns` field in the response will protocol strings like `/ipfs/id/1.0.0` or `/celestia/header-ex/v0.0.3`
+            - `datacenter` - The `columns` field in the response will contain names of datacenters that peers are hosted in like `Amazon`.
+            - `isDatacenter` - The `columns` field in the response will just contain `true` or `false`.
+            
+            We don't give a guarantee for the above. Especially `protocol` seems of low interest so we might drop that.
           required: true
           schema:
             $ref: '#/components/schemas/CelestiaStatistics'
@@ -104,12 +114,29 @@ paths:
             
             Further, the time range spanned by start and end will be divided
             into `interval`-sized chunks in which the aggregation happens.
+            
+            The value needs to be a multiple of the minimum interval size of
+            600 seconds (10 minutes).
 
           schema:
             type: integer
-            minimum: 1
+            minimum: 600
             default: 3600
           example: "86400"
+        - name: nodetypes
+          in: query
+          description: |
+            A comma separated list of node types to filter the results by. The
+            results will only contain nodes with any of the given type. The
+            maximum number of node types you can define here is five.
+            
+            If no node types are specified, no filtering takes place and all
+            types will be returned.
+          schema:
+            type: array
+            items:
+              type: string
+          example: "bridge,light"
       responses:
         '200':
           description: Success
@@ -175,8 +202,9 @@ paths:
                         description: |
                           Depending on the aggregation this is index for the data.
                           When plotting the data, this commonly will contain
-                          x-axis values. In the case of the `nodetype` statistic
-                          this will contain timestamp strings in the [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)
+                          x-axis values. In the case of the `nodetype` and `version`
+                          statistics this will contain timestamp strings in the
+                          [RFC 3339](https://datatracker.ietf.org/doc/html/rfc3339)
                           format with seconds precision.
                       columns:
                         type: array
@@ -186,9 +214,13 @@ paths:
                           For each index entry we can have multiple values that
                           correspond to that index. In the case of the `nodetype`
                           statistic we can have values for multiple node types
-                          at each timestamp. This `colums` array will contain
+                          at each timestamp. This `columns` array will contain
                           an ordered list of node types. The ordering corresponds
                           to the values array of arrays below.
+                          
+                          In the case of the `version` statistic this array will
+                          contain a lexicographically sorted list of valid semver
+                          strings.
                       values:
                         type: array
                         items:
@@ -216,8 +248,24 @@ paths:
                         - "light"
                         - "other"
                       values:
-                        - [ 124, 17, 229, 33 ]
-                        - [ 123, 17, 229, 33 ]
+                        - [ 124, 17, 229, 33]
+                        - [ 123, 17, 229, 33]
+                  - data:
+                      start: "2024-12-05T00:00:00"
+                      end: "2024-12-05T02:00:00"
+                      interval: 3600
+                      statistic: "version"
+                      project: "celestia"
+                      network: "mainnet"
+                      index:
+                        - "2024-12-05T00:00:00"
+                        - "2024-12-05T01:00:00"
+                      columns:
+                        - "0.17.1"
+                        - "0.20.0"
+                      values:
+                        - [ 124, 17]
+                        - [ 123, 17]
 
         '400':
           description: Bad Request
@@ -232,7 +280,7 @@ components:
     ApiKeyAuth:
       type: apiKey
       in: header
-      name: X-API-Key
+      name: ProbeLab-API-Key
 
   parameters:
     celestiaNetwork:
@@ -247,7 +295,7 @@ components:
   schemas:
     CelestiaStatistics:
       type: string
-      enum: [nodetype]
+      enum: [nodetype, version]
 
   responses:
     ErrorResponse:
