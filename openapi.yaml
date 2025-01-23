@@ -4,7 +4,7 @@ info:
   summary: ProbeLab API for awesome metrics 💫
   description: |
     The ProbeLab API offers endpoints for retrieving detailed network 
-    metrics. 
+    metrics.
 
     This API loosely follows the [Google JSON Style Guide](https://google.github.io/styleguide/jsoncstyleguide.xml).
     This means, all successful responses will only have a `data` field
@@ -13,7 +13,7 @@ info:
     the style guide, if there are multiple errors the `error` object will
     contain another `errors` array.
 
-  version: 0.2.0
+  version: 0.3.0
   contact:
     name: ProbeLab Team
     url: https://probelab.io
@@ -43,6 +43,14 @@ paths:
 
       operationId: getNetworkStats
       parameters:
+        - in: header
+          name: X-Request-ID
+          description: |
+            When you provide the `X-Request-ID` header and encounter an issue
+            with the API we will be better able to identify the cause.
+          schema:
+            type: string
+            format: uuid
         - $ref: '#/components/parameters/celestiaNetwork'
         - name: statistic
           in: path
@@ -51,8 +59,6 @@ paths:
             
             In the future we plan to support:
             
-            - `country` - The `columns` field in the response will contain 2 letter
-              [ISO 3166-1](https://en.wikipedia.org/wiki/ISO_3166-1) alpha-2 codes like `US`, `GR`, or `FR`.
             - `protocol` - The `columns` field in the response will protocol strings like `/ipfs/id/1.0.0` or `/celestia/header-ex/v0.0.3`
             - `datacenter` - The `columns` field in the response will contain names of datacenters that peers are hosted in like `Amazon`.
             - `isDatacenter` - The `columns` field in the response will just contain `true` or `false`.
@@ -221,6 +227,28 @@ paths:
                           In the case of the `version` statistic this array will
                           contain a lexicographically sorted list of valid semver
                           strings.
+                          
+                          In the case of the `country` statistic this array will
+                          contain [ISO 3166-1](https://en.wikipedia.org/wiki/ISO_3166-1)
+                          alpha-2 codes like `US`, `GR`, or `FR`. There are two
+                          special cases that will also appear in this array
+                          which are `unknown` and `multi`. The former means that
+                          we were not able to map a certain peer to a country
+                          and the latter means that we saw a peer connecting from
+                          multiple countries.
+                          
+                          In the case of the `city` statistic this array will
+                          contain geohash+city name combinations formatted like
+                          `$geo_hash,$city_name`. Note that there can be
+                          multiple different geo hashes for the same city name.
+                          There are two special cases as in the `country`
+                          statistic. This array may also contain entries that
+                          correspond to unknown and multiple locations of peers.
+                          These will appear in the resulting array as
+                          `s00000000,multi` and `s00000000,unknown`
+                          respectively. `s00000000` corresponds to the lat/long
+                          values of `0`, `0`.
+
                       values:
                         type: array
                         items:
@@ -266,6 +294,38 @@ paths:
                       values:
                         - [ 124, 17]
                         - [ 123, 17]
+                  - data:
+                      start: "2024-12-05T00:00:00"
+                      end: "2024-12-05T02:00:00"
+                      interval: 3600
+                      statistic: "country"
+                      project: "celestia"
+                      network: "mainnet"
+                      index:
+                        - "2024-12-05T00:00:00"
+                        - "2024-12-05T01:00:00"
+                      columns:
+                        - "FR"
+                        - "ES"
+                      values:
+                        - [ 124, 17]
+                        - [ 123, 17]
+                  - data:
+                      start: "2024-12-05T00:00:00"
+                      end: "2024-12-05T02:00:00"
+                      interval: 3600
+                      statistic: "city"
+                      project: "celestia"
+                      network: "mainnet"
+                      index:
+                        - "2024-12-05T00:00:00"
+                        - "2024-12-05T01:00:00"
+                      columns:
+                        - "69y7hj5ttkde,Caseros"
+                        - "6e9dch78y512,Salta"
+                      values:
+                        - [ 124, 17]
+                        - [ 123, 17]
 
         '400':
           description: Bad Request
@@ -295,7 +355,7 @@ components:
   schemas:
     CelestiaStatistics:
       type: string
-      enum: [nodetype, version]
+      enum: [nodetype, version, country, city]
 
   responses:
     ErrorResponse:
