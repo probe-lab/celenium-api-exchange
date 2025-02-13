@@ -13,7 +13,7 @@ info:
     the style guide, if there are multiple errors the `error` object will
     contain another `errors` array.
 
-  version: 0.3.0
+  version: 0.4.0
   contact:
     name: ProbeLab Team
     url: https://probelab.io
@@ -143,6 +143,51 @@ paths:
             items:
               type: string
           example: "bridge,light"
+        - name: format
+          in: query
+          description: |
+            **Only applies to the `city` statistic**
+            
+            When requesting city aggregate data each column corresponds to a
+            specific city and the values the number of unique peers we found
+            in this city in the given time period and interval.
+            
+            With this parameter you can control which information associated
+            with each city should be returned.
+            
+            Valid values are:
+              - `$continent`
+              - `$country`
+              - `$latitude`
+              - `$longitude`
+              - `$geohash`
+              - `$city`
+            
+            The value for this query parameter is a comma separated list of
+            the above formatting directives. There are two limitations:
+            
+            1. You cannot change the order of the format but only enable/disable
+               the amount of information. For example: `$city,$country` is not allowed.
+               The reason is that city names can also contain `,` characters
+            2. You always need to have either the `$geohash` or `$latitude,$longitude`
+               directive in the format.
+            
+            The default format is `$geohash,$city` which will return column
+            values like: `u4rpzkgevr73,Tjøllingvollen`.
+            
+            More information about what geohashes are on [Wikipedia](https://en.wikipedia.org/wiki/Geohash).
+            
+            The full schema `$continent,$country,$latitude,$longitude,$geohash,$city`
+            would look like: `EU,FR,u09tvmyy1um8,2.349440097808838,48.85588073730469,Paris`
+
+          schema:
+            type: array
+            default:
+              - $geohash
+              - $city
+            items:
+              type: string
+          example: "$continent,$country,$latitude,$longitude,$geohash,$city"
       responses:
         '200':
           description: Success
@@ -230,24 +275,31 @@ paths:
                           
                           In the case of the `country` statistic this array will
                           contain [ISO 3166-1](https://en.wikipedia.org/wiki/ISO_3166-1)
-                          alpha-2 codes like `US`, `GR`, or `FR`. There are two
-                          special cases that will also appear in this array
-                          which are `unknown` and `multi`. The former means that
-                          we were not able to map a certain peer to a country
-                          and the latter means that we saw a peer connecting from
-                          multiple countries.
+                          alpha-2 codes like `US`, `GR`, or `FR`. If a peer was
+                          seen in more than one country in the specified time
+                          interval, the peer only counts towards the latest
+                          country in the interval. So for example if the
+                          aggregation interval is 1h and after a minute we see
+                          peer A in the US and after another 30 minutes we see
+                          the same peer A in FR, the peer is only counted towards
+                          France. There is one special case where we were not
+                          able to geolocate a peer. In this case the array will
+                          contain the value `unknown`.
                           
                           In the case of the `city` statistic this array will
                           contain geohash+city name combinations formatted like
-                          `$geo_hash,$city_name`. Note that there can be
+                          `$geo_hash,$city_name` by default. The format can be
+                          configured with the `format` query parameter. See the
+                          corresponding documentation. Note that there can be
                           multiple different geo hashes for the same city name.
-                          There are two special cases as in the `country`
-                          statistic. This array may also contain entries that
-                          correspond to unknown and multiple locations of peers.
-                          These will appear in the resulting array as
-                          `s00000000,multi` and `s00000000,unknown`
-                          respectively. `s00000000` corresponds to the lat/long
-                          values of `0`, `0`.
+                          Similar to the `country` statistic, only the latest
+                          city in the time interval is considered. This array
+                          may also contain entries that correspond to unknown
+                          locations of peers. These will appear in the resulting
+                          array as `s00000000,unknown` in the default formatting
+                          case. `s00000000` corresponds to the lat/long values
+                          of `0`, `0`. The full format for an unknown city is
+                          `unknown,unknown,s00000000000,0,0,unknown`.
 
                       values:
                         type: array
