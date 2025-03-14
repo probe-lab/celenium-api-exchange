@@ -425,7 +425,7 @@ paths:
         Check out the documentation of the response schema to learn more about
         the idiosyncrasies of the data.
 
-      operationId: getCelestiaStatsNodeType
+      operationId: getCelestiaConnection
       parameters:
         - $ref: '#/components/parameters/requestID'
         - $ref: '#/components/parameters/celestiaNetwork'
@@ -543,7 +543,7 @@ paths:
         Check out the documentation of the response schema to learn more about
         the idiosyncrasies of the data.
 
-      operationId: getCelestiaStatsNodeType
+      operationId: getCelestiaDatacenter
       parameters:
         - $ref: '#/components/parameters/requestID'
         - $ref: '#/components/parameters/celestiaNetwork'
