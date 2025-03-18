@@ -522,7 +522,7 @@ paths:
     get:
       tags:
         - Celestia
-      summary: Celestia peer connection distribution
+      summary: Celestia peer datacenter distribution
       description: |
         This endpoint returns the number of peers we have found to interact
         from a particular datacenter.
@@ -573,16 +573,53 @@ paths:
                             items:
                               type: string
                             description: |
-                              For each index entry we can have multiple values that
-                              correspond to that index. In the case of the `datacenter`
-                              statistic, this array will contain values like
+                              We are currently grouping peers in the following
+                              datacenter categories:
                               
-                              - AWS
-                              - Azure
-                              - GCP
-                              - Hetzner
-                              - Other
-                              - unknown
+                              - `AWS`
+                              - `Alibaba`
+                              - `Azure`
+                              - `Cisco`
+                              - `Contabo`
+                              - `Digital Ocean`
+                              - `GCP`
+                              - `Hetzner`
+                              - `IBM`
+                              - `Linode`
+                              - `OVH`
+                              - `Oracle`
+                              - `Rackspace`
+                              - `Scaleway`
+                              - `Tencent`
+                              - `Verizon`
+                              - `Vultr`
+                              
+                              If there's a provider missing from that list, please
+                              reach out to [`team@probelab.io`](team@probelab.io)
+                              and we will add it to the list. That being said,
+                              when integrating this endpoint, don't expect this
+                              list to be stable.
+                              
+                              This endpoint will also only return the datacenters
+                              where we found peers in the specified time interval.
+                              
+                              All peers that run from within a cloud environment
+                              and don't belong into one of the above datacenters
+                              will be grouped under the `Other` key. For completeness
+                              this endpoint also returns the number of peers
+                              that do not run from a cloud environment. They
+                              will be grouped under the `Non-Datacenter` key.
+                              Finally, if there is a peer whose location we could
+                              not identify, we group it under `unknown` (lower
+                              case for consistency reasons with the other
+                              endpoints).
+                              
+                              So, additionally this array will contain the keys:
+                              
+                              - `Other`
+                              - `Non-Datacenter`
+                              - `unknown`
+
                 example:
                   data:
                     start: "2024-12-05T00:00:00"
@@ -595,13 +632,15 @@ paths:
                       - "2024-12-05T00:00:00"
                       - "2024-12-05T01:00:00"
                     columns:
-                      - "unknown"
                       - "AWS"
                       - "Azure"
                       - "Hetzner"
+                      - "Other"
+                      - "Non-Datacenter"
+                      - "unknown"
                     values:
-                      - [ 124, 17, 229, 33 ]
-                      - [ 123, 17, 229, 33 ]
+                      - [ 124, 17, 229, 33, 6, 0 ]
+                      - [ 123, 17, 229, 33, 9, 0 ]
 
         '400':
           description: Bad Request
@@ -609,6 +648,7 @@ paths:
         '401':
           description: Unauthorized
           $ref: '#/components/responses/ErrorResponse'
+          
 components:
   securitySchemes:
     ApiKeyAuth:
